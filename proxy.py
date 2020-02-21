@@ -9,28 +9,28 @@ import time
 BUFFER_LENGTH = 1048576 # buffer size = 2^20
 cacheDict = {}
 
-def saveDict():
+def saveDict(): # saves cache to cache.pkl when exiting the program
   with open('cache' + '.pkl', 'wb') as f:
     pickle.dump(cacheDict, f, pickle.HIGHEST_PROTOCOL)
 
-def readDict():
+def readDict(): # reads the cache saved from last session in cache.pkl
     with open('cache' + '.pkl', 'rb') as f:
         cacheDict = pickle.load(f)
 
-def exit_handler():
+def exit_handler(): # on ctrl+C save cache
   saveDict()
   print("Cache saved")
 
-def readBlocked():
+def readBlocked(): # lists what urls have been blocked
   listBlocked = open("blocked.txt").read()
   print(listBlocked)
 
-def writeToBlocked(block):
+def writeToBlocked(block): # adds a new url to the list of blocked urls
   f = open("blocked.txt", "a")
   f.write(block + "\n")
   f.close
 
-def removeBlocked(blocked):
+def removeBlocked(blocked): # unblocks a url
   lines = open("blocked.txt").read().splitlines()
   f = open("blocked.txt", "w")
   for line in lines:
@@ -38,14 +38,14 @@ def removeBlocked(blocked):
       f.write(str(line + "\n"))
   f.close
 
-def isBlocked(blocked):
+def isBlocked(blocked): # checks if a url is blocked
   lines = open("blocked.txt").read().splitlines()
   for line in lines:
     if (str(line) in (blocked)):
       return True
   return False
 
-def inputLoop():
+def inputLoop(): # prompts the user asking them if they would like to start the proxy, edit the blocked urls list or clear the cache
   while True:
     choice = int(input("Type 1 to start proxy server, 2 to block a url, 3 to unblock a url, 4 to list all blocked urls, 5 to clear cache: "))
     if choice == 1:
@@ -67,13 +67,13 @@ def inputLoop():
     else:
     	print("Command not recognised")
 
-def main():
+def main(): # begins by reading the saved cache and beginning user input prompt
   atexit.register(exit_handler) # set up cache save at exit
   readDict() # read cache from cache.pkl
   inputLoop() # begin IO
 
 
-class Server:
+class Server: # Server class handles web socket connections
   def __init__(self, port): 
     self.serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # socket creation
     self.serverSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -85,7 +85,7 @@ class Server:
       threadListener.setDaemon(True)
       threadListener.start()
 
-  def getPort(self, request, url):
+  def getPort(self, request, url): # gets the port from a websocket request
     http_pos = url.find("://")
     if (http_pos==-1):
         temp = url
@@ -106,12 +106,12 @@ class Server:
         webserver = temp[:port_pos]
     return port
 
-  def getUrl(self, request):
+  def getUrl(self, request): # gets the url from a websocket request
     first_line = str(request).split('\n')[0]
     url = first_line.split(' ')[1]
     return url
 
-  def getWebserver(self, request, url):
+  def getWebserver(self, request, url): # gets the webserver from a websocket request
     http_pos = url.find("://")
     if (http_pos==-1):
         temp = url
@@ -133,12 +133,17 @@ class Server:
     return webserver
 
 
-
+  '''
+  This method handles a websocket request. It checks to see if the url is blocked. If it is it ends the request without sending data to the browser.
+  If the url isn't blocked, it checks if the request is already in the cache. If it is it sends the data from the cache to the user.
+  If the request is neither blocked nor in the cache, this method sends the request to the webserver, receives the data, passes the data to the browser and 
+  saves the data in the cache.
+  '''
   def requestReceived(self, proxySocket, proxy_address):
     print()
     try:
-      request = proxySocket.recv(BUFFER_LENGTH)
-      if (str(request).split('\n')[0] == "b''"):
+      request = proxySocket.recv(BUFFER_LENGTH) # receive request
+      if (str(request).split('\n')[0] == "b''"): # check if request is empty and do nothing if it is
       	print("Empty request")
       	proxySocket.close()
       	return
@@ -151,34 +156,32 @@ class Server:
         proxySocket.close() # if website is on the blocked list then close socket
       elif (request in cacheDict):
         print("Cache hit, fetching from cache")
-        start = time.time()
-        data = cacheDict[request]
+        start = time.time() # begin timing how long cache access takes
+        data = cacheDict[request] # get request from cache
         while 1:
           if (len(data) > 0):
               proxySocket.send(data) # send data to browser
           else:
               break
           break
-        end = time.time()
+        end = time.time() # end timer
         timeElapsed = (end - start) * 1000
         print("Request for " + webserver + " handled from cache in " + str(timeElapsed) + "ms") 
         proxySocket.close()
       else:
-        start = time.time()
+        start = time.time() # start timer to see how long request takes to process without cache access
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
         s.connect((webserver, port))
         s.send(request) # send request to server
         while 1:
           data = s.recv(BUFFER_LENGTH) # receive data from server
-          #saveDict()
-          cacheDict[request] = data
-          #print(data)
+          cacheDict[request] = data # save request in cache
           if (len(data) > 0):
               proxySocket.send(data) # send data to browser
           else:
               break
           break
-        end = time.time()
+        end = time.time() # end timer
         timeElapsed = (end - start) * 1000
         print("Request completed in " + str(timeElapsed) + "ms")
         s.close()
