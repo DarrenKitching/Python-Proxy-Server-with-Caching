@@ -6,7 +6,7 @@ import pickle # file format for saving cache dict
 import atexit # used to save cache before program exit
 import time
 
-BUFFER_LENGTH = 2048 # buffer size = 2^11
+BUFFER_LENGTH = 1048576 # buffer size = 2^20
 cacheDict = {}
 
 def saveDict():
@@ -158,6 +158,7 @@ class Server:
               proxySocket.send(data) # send data to browser
           else:
               break
+          break
         end = time.time()
         timeElapsed = (end - start) * 1000
         print("Request for " + webserver + " handled from cache in " + str(timeElapsed) + "ms") 
@@ -172,20 +173,22 @@ class Server:
           #saveDict()
           cacheDict[request] = data
           #print(data)
-          print("Finised receiving data - begin sending")
           if (len(data) > 0):
               proxySocket.send(data) # send data to browser
           else:
               break
+          break
         end = time.time()
         timeElapsed = (end - start) * 1000
         print("Request completed in " + str(timeElapsed) + "ms")
         s.close()
         proxySocket.close()
     except OSError:
-      print("Socket Error")
+      #print("Socket Error")
+      pass
     except IOError:
-      print("Pipe Error")
+      #print("Pipe Error")
+      pass
 
 if __name__== "__main__":
   main()
